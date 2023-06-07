@@ -1,0 +1,2 @@
+npm i express mongoose bcryptjs dotenv cors jsonwebtoken @hapi/joi --save
+npm install -g nodemon
