@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken')
 const users = require('../models/user')
 
 const validator = require('@hapi/joi')
-const user = require('../models/user')
 const registrationSchema = validator.object({
     name: validator.string().required(),
     email: validator.string().required().email(),

@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const global_config = require('../models/global-config')
 const validator = require('@hapi/joi')
+const {updateUserAnnualLeaveCount} = require('../services/leave-count-service')
 
 const configSchema = validator.object({
     configName: validator.string().required(),
@@ -47,13 +48,13 @@ router.post('/add', async (req, res)=>{
     }
 })
 
-router.post('/update', async (req, res)=>{
+router.put('/update', async (req, res)=>{
     const {userId, role} = req.user
     if(role ==="Admin"){
-        const globalConfig = await global_config.findOne({configName: req.body.configName})
+        let globalConfig = await global_config.findOne({configName: req.body.configName})
         if(globalConfig){
+            await updateUserAnnualLeaveCount(req.body.configValue, globalConfig.configValue);
             globalConfig.configValue = req.body.configValue
-
             try {
                 const savedConfig = await globalConfig.save()
                 res.status(200).json({status: true, message: 'global config updated!!!'})
