@@ -6,3 +6,5 @@ class NotFoundError extends BaseError{
         super(message, HttpStatus.NOT_FOUND)
     }
 }
+
+module.exports = {NotFoundError}

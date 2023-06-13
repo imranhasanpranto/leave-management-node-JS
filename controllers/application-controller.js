@@ -2,116 +2,59 @@ const leave_application = require('../models/leave-application')
 const validator = require('@hapi/joi')
 const mongoose = require('mongoose')
 const {saveFile} = require('../services/file-service')
-const {getAllRequestsByUserId, getAllRequests, getById, updateStatus, getAllLeaveDates, getLeaveCount, getLeaveCountbalance, updateAnnualLeavesCount} = require('../services/application-service')
+const {
+    getAllRequestsByUserId, getAllRequests, getById, updateStatus, 
+    getAllLeaveDates, getLeaveCount, getLeaveCountbalance, 
+    updateAnnualLeavesCount, getPendingApplicationList, addLeaveApplication,
+    updateLeaveApplication
+} = require('../services/application-service')
 const {getUserById} = require('../services/user-service')
 const {updateLeaveBalance} = require('../services/leave-count-service')
 const {saveLeaveDaysByApplicationId, deleteByAppId} = require('../services/leave-days-service')
 const {getLeaveBalance} = require('../services/leave-count-service')
 const moment = require('moment')
 
+const {DataSaveError} = require('../exceptions/DataSaveError')
+const {MethodArgumentNotValidError} = require('../exceptions/MethodArgumentNotValidError')
+const {NotFoundError} = require('../exceptions/NotFoundError')
+
 const addApplication = async (req, res)=>{
-    const {userId, role} = req.user
-    let path = ''
-    if(req.file){
-        path = saveFile(req.file, userId)
-    }else{
-        console.log('no file found')
-    }
-
-    let leaveDaysDTO = await getLeaveCount(req.body.fromDate, req.body.toDate, userId, '-1')
-    const year = new Date().getFullYear()
-    let leaveBalance = await getLeaveBalance(userId, year)
-    let currentBalance = leaveBalance.value - leaveDaysDTO.leaveCount
-    if(currentBalance < 0){
-        return res.status(400).json({status: false, message: 'Annual Leave Count Exceeded!'})
-    }
-    await updateLeaveBalance(userId, currentBalance)
-
-    const userInfo = await getUserById(userId)
-
-    let app_id = new mongoose.Types.ObjectId()
-    const applicationSchema = new leave_application({
-        _id: app_id,
-        userId: userId,
-        userName: userInfo.name,
-        fromDate: new Date(moment(req.body.fromDate).format('YYYY-MM-DD')),
-        toDate: new Date(moment(req.body.toDate).format('YYYY-MM-DD')),
-        leaveType: req.body.leaveType,
-        leaveReason: req.body.leaveReason,
-        emergencyContact: req.body.emergencyContact,
-        applicationStatus: 'Pending',
-        leaveCount: leaveDaysDTO.leaveCount,
-        filePath: path
-    })
 
     try {
-        const application = await applicationSchema.save()
-
-        await saveLeaveDaysByApplicationId(leaveDaysDTO.leaveDays, app_id)
-
+        await addLeaveApplication(req)
         res.status('200').json({status: true, message: 'Leave request added successfully'})
     } catch (error) {
-        res.status(500).json({status: false, message: 'Failed!'})
+        if(error instanceof DataSaveError){
+            return res.status(error.httpCode).json({status: false, message: error.message})
+        }else if(error instanceof MethodArgumentNotValidError){
+            return res.status(error.httpCode).json({status: false, message: error.message})
+        }else{
+            res.status(500).json({status: false, message: "Server error"})
+        }
     }
 }
 
 const updateApplication = async (req, res)=>{
-    const {userId, role} = req.user
-    console.log(req.body, req.file)
-
-    const applicationOld = await getById(req.body.id)
-
-    let path = applicationOld.filePath
-    if(req.body.isFileUpdated=='true'){
-        path = ''
-        if(req.file){
-            path = saveFile(req.file, userId)
-        }else{
-            console.log('no file found')
-        }
-    }
-
-
-    let leaveDaysDTO = await getLeaveCount(req.body.fromDate, req.body.toDate, userId, req.body.id)
-    const year = new Date().getFullYear()
-    let leaveBalance = await getLeaveBalance(userId, year)
-    let currentBalance = leaveBalance.value - leaveDaysDTO.leaveCount + applicationOld.leaveCount
-    if(currentBalance < 0){
-        return res.status(400).json({status: false, message: 'Annual Leave Count Exceeded!'})
-    }
-    await updateLeaveBalance(userId, currentBalance)
-   
-    applicationOld.fromDate = new Date(moment(req.body.fromDate).format('YYYY-MM-DD'))
-    applicationOld.toDate = new Date(moment(req.body.toDate).format('YYYY-MM-DD'))
-    applicationOld.leaveType = req.body.leaveType
-    applicationOld.leaveReason = req.body.leaveReason
-    applicationOld.emergencyContact = req.body.emergencyContact
-    applicationOld.applicationStatus = 'Pending'
-    applicationOld.leaveCount = leaveDaysDTO.leaveCount
-    applicationOld.filePath = path
-
     try {
-        const application = await applicationOld.save()
-
-        await deleteByAppId(applicationOld._id)
-        await saveLeaveDaysByApplicationId(leaveDaysDTO.leaveDays, applicationOld._id)
-
+        await updateLeaveApplication(req)
         res.status('200').json({status: true, message: 'Leave request updated successfully'})
     } catch (error) {
-        res.status(500).json({status: false, message: 'Failed!'})
+        if(
+            error instanceof DataSaveError || 
+            error instanceof MethodArgumentNotValidError || 
+            error instanceof NotFoundError
+            ){
+            return res.status(error.httpCode).json({status: false, message: error.message})
+        }else{
+            res.status(500).json({status: false, message: "Server error"})
+        }
     }
 }
 
 const getPendingList = async (req, res)=>{
-    const {userId, role} = req.user
     try {
-        if(role ==="Admin"){
-            const list = await getAllRequests('Pending')
-            res.status(200).json(list)
-        }else{
-            const list = await getAllRequestsByUserId('Pending', userId)
-            res.status(200).json(list)
-        }
+        const list = await getPendingApplicationList(req)
+        res.status(200).json(list)
     } catch (error) {
         res.status(500).json({status: false, message: 'Failed!'})
     }
