@@ -5,4 +5,8 @@ async function getUserById(userId){
     return user
 }
 
-module.exports = {getUserById}
+async function isUserEmailExist(email){
+    return await users.findOne({email: email})
+}
+
+module.exports = {getUserById, isUserEmailExist}

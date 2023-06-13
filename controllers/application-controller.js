@@ -11,15 +11,12 @@ const moment = require('moment')
 
 const addApplication = async (req, res)=>{
     const {userId, role} = req.user
-    console.log(req.body, req.file)
     let path = ''
     if(req.file){
         path = saveFile(req.file, userId)
     }else{
         console.log('no file found')
     }
-
-    console.log(req.body)
 
     let leaveDaysDTO = await getLeaveCount(req.body.fromDate, req.body.toDate, userId, '-1')
     const year = new Date().getFullYear()
@@ -107,13 +104,16 @@ const updateApplication = async (req, res)=>{
 
 const getPendingList = async (req, res)=>{
     const {userId, role} = req.user
-    if(role ==="Admin"){
-        const list = await getAllRequests('Pending')
-        //console.log(list)
-        res.status(200).json(list)
-    }else{
-        const list = await getAllRequestsByUserId('Pending', userId)
-        res.status(200).json(list)
+    try {
+        if(role ==="Admin"){
+            const list = await getAllRequests('Pending')
+            res.status(200).json(list)
+        }else{
+            const list = await getAllRequestsByUserId('Pending', userId)
+            res.status(200).json(list)
+        }
+    } catch (error) {
+        res.status(500).json({status: false, message: 'Failed!'})
     }
 }
 
@@ -181,12 +181,16 @@ const getAllLeaveDatesByApplicationId = async (req, res)=>{
 
 const isAnnualLeaveCountExceedsByApplicationIdId = async (req, res)=>{
     const {userId, role} = req.user
-    let count = await getLeaveCountbalance(req.params.fromDate, req.params.toDate, userId, req.params.app_id)
-    let status = false
-    if(count < 0){
-        status = true
+    try {
+        let count = await getLeaveCountbalance(req.params.fromDate, req.params.toDate, userId, req.params.app_id)
+        let status = false
+        if(count < 0){
+            status = true
+        }
+        res.status(200).json({status: status})
+    } catch (error) {
+        res.status(500).json({status: false, message: 'Failed!'})
     }
-    res.status(200).json({status: status})
 }
 module.exports = {
     addApplication, updateApplication, getPendingList, 

@@ -1,4 +1,4 @@
-
+const path = require('path');
 const getFileByUserAndPath = (req, res)=>{
     const {id, filePath} = req.params
     const options = {
